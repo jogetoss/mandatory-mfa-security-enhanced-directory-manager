@@ -2,7 +2,7 @@
 
 The Mandatory MFA Security Enhanced Directory Manager plugin extends the default [SEDM](https://dev.joget.org/community/display/DX8/Security+Enhanced+Directory+Manager) plugin by requiring users to activate MFA upon logging in, when configured with a compatible mandatory MFA authenticator.
 
-You can modify this plugin to have extra logic when deciding whether the current user should require MFA, by modifying the [`loginPostProcessing` method in the `MandatoryMfaUserSecurityImpl` class](https://github.com/jogetoss/mandatory-mfa-security-enhanced-directory-manager/blob/b33df2fc15f93e75153a6abcd52acee8824561f0/src/main/java/org/joget/marketplace/MandatoryMfaUserSecurityImpl.java#L49)
+You can customize this plugin to include additional logic for determining whether the current user is required to activate MFA by modifying the [`loginPostProcessing` method in the `MandatoryMfaUserSecurityImpl` class](https://github.com/jogetoss/mandatory-mfa-security-enhanced-directory-manager/blob/b33df2fc15f93e75153a6abcd52acee8824561f0/src/main/java/org/joget/marketplace/MandatoryMfaUserSecurityImpl.java#L49)
 
 # Getting Help
 
