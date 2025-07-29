@@ -4,6 +4,8 @@ The Mandatory MFA Security Enhanced Directory Manager plugin extends the default
 
 You can customize this plugin to include additional logic for determining whether the current user is required to activate MFA by modifying the [`loginPostProcessing` method in the `MandatoryMfaUserSecurityImpl` class](https://github.com/jogetoss/mandatory-mfa-security-enhanced-directory-manager/blob/b33df2fc15f93e75153a6abcd52acee8824561f0/src/main/java/org/joget/marketplace/MandatoryMfaUserSecurityImpl.java#L49)
 
+To setup and configure this plugin, please see the [documentation](https://dev.joget.org/community/display/SANDBOX2/Mandatory+MFA+Security+Enhanced+Directory+Manager).
+
 # Getting Help
 
 JogetOSS is a community-led team for open source software related to the [Joget](https://www.joget.org) no-code/low-code application platform.
