@@ -3,6 +3,7 @@ package org.joget.marketplace;
 import org.joget.apps.app.service.AppPluginUtil;
 import org.joget.apps.app.service.AppUtil;
 import org.joget.apps.app.service.MfaAuthenticator;
+import org.joget.commons.util.StringUtil;
 import org.joget.directory.dao.RoleDao;
 import org.joget.directory.model.Role;
 import org.joget.directory.model.User;
@@ -11,7 +12,11 @@ import org.joget.plugin.directory.UserSecurityImpl;
 import org.joget.workflow.model.service.WorkflowUserManager;
 import org.joget.workflow.util.WorkflowUtil;
 
+import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.HttpSession;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 public class MandatoryMfaUserSecurityImpl extends UserSecurityImpl implements HiddenPlugin {
 
@@ -73,6 +78,44 @@ public class MandatoryMfaUserSecurityImpl extends UserSecurityImpl implements Hi
             }
         }
 
+    }
+
+    /**
+     * Core SEDM skips the MFA check for the change password submission (a=cps) and then
+     * logs the user in directly. Since the Forgot Password link and the expired password
+     * popup both submit to a=cps, the user ends up with a session without completing MFA.
+     *
+     * Let core save the new password, then end the session it just created and send the
+     * user back to the login page they came from, so that MFA (or forced MFA activation)
+     * is enforced on the next login.
+     */
+    @Override
+    protected String wsChangePasswordSubmitHandle(Map model, HttpServletRequest request, HttpServletResponse response) {
+        String content = super.wsChangePasswordSubmitHandle(model, request, response);
+
+        if ("true".equals(model.get("updated")) && getMfaAuthenticator() != null) {
+            //logout, same approach as MandatoryTotpMfaAuthenticator
+            WorkflowUserManager wum = (WorkflowUserManager) AppUtil.getApplicationContext().getBean("workflowUserManager");
+            wum.setCurrentThreadUser(WorkflowUserManager.ROLE_ANONYMOUS);
+            SecurityContextHolder.clearContext();
+
+            HttpSession session = request.getSession(false);
+            if (session != null) {
+                session.removeAttribute("SPRING_SECURITY_CONTEXT");
+            }
+
+            //we are inside the popup iframe, reload the parent login page (/web/login or /web/ulogin/...) without the token,
+            //fallback to the default login page if the parent is not a login page
+            String message = StringUtil.escapeString(getMessage("mmsedm.passwordChanged.relogin"), StringUtil.TYPE_JAVASCIPT, null);
+            String loginUrl = StringUtil.escapeString(request.getContextPath() + "/web/login", StringUtil.TYPE_JAVASCIPT, null);
+            content = "<script>"
+                    + "alert('" + message + "');"
+                    + "var path = parent.window.location.pathname;"
+                    + "if (path.indexOf('/web/login') === -1 && path.indexOf('/ulogin/') === -1) { path = '" + loginUrl + "'; }"
+                    + "parent.window.location = path;"
+                    + "</script>";
+        }
+        return content;
     }
 
     protected String getMessage(String key) {
