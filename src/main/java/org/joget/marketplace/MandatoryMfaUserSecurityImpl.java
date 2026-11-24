@@ -104,6 +104,9 @@ public class MandatoryMfaUserSecurityImpl extends UserSecurityImpl implements Hi
                 session.removeAttribute("SPRING_SECURITY_CONTEXT");
             }
 
+            //discard the system alert set by core for this login (eg. last login info), it is not a valid login anymore
+            AppUtil.getSystemAlert();
+
             //we are inside the popup iframe, reload the parent login page (/web/login or /web/ulogin/...) without the token,
             //fallback to the default login page if the parent is not a login page
             String message = StringUtil.escapeString(getMessage("mmsedm.passwordChanged.relogin"), StringUtil.TYPE_JAVASCIPT, null);
@@ -112,10 +115,28 @@ public class MandatoryMfaUserSecurityImpl extends UserSecurityImpl implements Hi
                     + "alert('" + message + "');"
                     + "var path = parent.window.location.pathname;"
                     + "if (path.indexOf('/web/login') === -1 && path.indexOf('/ulogin/') === -1) { path = '" + loginUrl + "'; }"
-                    + "parent.window.location = path;"
+                    + "parent.window.location.replace(path);"
                     + "</script>";
         }
         return content;
+    }
+
+    /**
+     * The login page opens the change password popup whenever it finds a forgot password token,
+     * either in its own URL (the link in the email, /web/login?t=...) or in the saved request / referer.
+     * Once the password is reset the token is deleted, so loading that URL again (redirect back,
+     * refresh, back button or clicking the email link again) would show a popup with
+     * "Invalid forgot password token". Ignore a token that no longer exists so the normal login
+     * page is shown instead. A valid token still opens the change password popup.
+     */
+    @Override
+    protected String getForgotPasswordToken() {
+        String token = super.getForgotPasswordToken();
+        if (token != null && getUserPasswordHistoryDao() != null
+                && getUserPasswordHistoryDao().getUserPasswordHistoryById(token) == null) {
+            token = null;
+        }
+        return token;
     }
 
     protected String getMessage(String key) {
