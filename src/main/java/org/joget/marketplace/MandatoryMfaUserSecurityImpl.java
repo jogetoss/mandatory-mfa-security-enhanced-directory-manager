@@ -17,6 +17,7 @@ import java.util.Map;
 
 import org.joget.commons.util.LogUtil;
 import org.joget.commons.util.StringUtil;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 
 public class MandatoryMfaUserSecurityImpl extends UserSecurityImpl implements HiddenPlugin {
@@ -48,8 +49,8 @@ public class MandatoryMfaUserSecurityImpl extends UserSecurityImpl implements Hi
         }
 
         WorkflowUserManager wum = (WorkflowUserManager) AppUtil.getApplicationContext().getBean("workflowUserManager");
-        String username = wum.getCurrentUsername();
-        if (username == null || username.isEmpty() || WorkflowUserManager.ROLE_ANONYMOUS.equals(username)) {
+        String username = getCurrentUsername(wum);
+        if (isAnonymous(username)) {
             return content;
         }
 
@@ -70,6 +71,30 @@ public class MandatoryMfaUserSecurityImpl extends UserSecurityImpl implements Hi
             LogUtil.error(getClassName(), e, "Unable to start MFA after password reset");
             return "<script>parent.window.location = '" + StringUtil.escapeString(getRedirectUrl(), StringUtil.TYPE_JAVASCIPT, null) + "';</script>";
         }
+    }
+
+    /**
+     * The username of the user currently logged in. Joget 8.x can keep reporting the anonymous
+     * user from the workflow user manager even after the login has been placed in the Spring
+     * security context (right after a password reset or OTP verification), so fall back to the
+     * security context in that case.
+     */
+    private String getCurrentUsername(WorkflowUserManager wum) {
+        String username = wum.getCurrentUsername();
+        if (isAnonymous(username)) {
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            if (auth != null && !isAnonymous(auth.getName())) {
+                return auth.getName();
+            }
+        }
+        return username;
+    }
+
+    private boolean isAnonymous(String username) {
+        return username == null
+                || username.isEmpty()
+                || WorkflowUserManager.ROLE_ANONYMOUS.equals(username)
+                || "anonymousUser".equals(username);
     }
 
     @Override
@@ -95,8 +120,8 @@ public class MandatoryMfaUserSecurityImpl extends UserSecurityImpl implements Hi
     @Override
     public void loginPostProcessing(User user, String password, Boolean loggedIn) {
         WorkflowUserManager wum = (WorkflowUserManager) AppUtil.getApplicationContext().getBean("workflowUserManager");
-        String currentUser = wum.getCurrentUsername();
-        boolean isProfileUpdate = currentUser.equals(user.getUsername());
+        String currentUser = getCurrentUsername(wum);
+        boolean isProfileUpdate = currentUser != null && currentUser.equals(user.getUsername());
 
         if (loggedIn && !isProfileUpdate) {
             MfaAuthenticator mfaAuthenticator = super.getMfaAuthenticator();
